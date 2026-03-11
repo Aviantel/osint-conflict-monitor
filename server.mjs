@@ -68,6 +68,10 @@ const WATCHLIST = [
 const cache = new Map();
 const CACHE_MS = 5 * 60 * 1000;
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function sendJson(res, status, data) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -112,68 +116,136 @@ async function fetchWithCache(key, fetcher) {
 function scoreArticle(title = '', source = '') {
   const text = `${title} ${source}`.toLowerCase();
   let score = 1;
-  const high = ['missile', 'airstrike', 'drone', 'offensive', 'incursion', 'naval', 'frontline', 'attack', 'explosion'];
-  const med = ['troops', 'military', 'ceasefire', 'sanctions', 'exercise', 'tension', 'warning'];
 
-  high.forEach((w) => {
-    if (text.includes(w)) score += 3;
-  });
-  med.forEach((w) => {
-    if (text.includes(w)) score += 1;
-  });
+  const high = [
+    'missile',
+    'airstrike',
+    'drone',
+    'offensive',
+    'incursion',
+    'naval',
+    'frontline',
+    'attack',
+    'explosion'
+  ];
+
+  const med = [
+    'troops',
+    'military',
+    'ceasefire',
+    'sanctions',
+    'exercise',
+    'tension',
+    'warning'
+  ];
+
+  for (const word of high) {
+    if (text.includes(word)) score += 3;
+  }
+
+  for (const word of med) {
+    if (text.includes(word)) score += 1;
+  }
 
   return score;
 }
 
-async function fetchRegion(region) {
+async function fetchGdeltJson(url, retries = 3) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 OSINT Conflict Monitor'
+      }
+    });
+
+    if (resp.ok) {
+      return resp.json();
+    }
+
+    if (resp.status === 429) {
+      lastError = new Error(`GDELT rate limited: 429`);
+      await sleep(1200 * (attempt + 1));
+      continue;
+    }
+
+    const text = await resp.text().catch(() => '');
+    throw new Error(`GDELT failed: ${resp.status}${text ? ` ${text.slice(0, 120)}` : ''}`);
+  }
+
+  throw lastError || new Error('GDELT request failed');
+}
+
+async function fetchRegion(region, index = 0) {
+  await sleep(index * 700);
+
   const encodedQuery = encodeURIComponent(region.query);
   const url =
     `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodedQuery}` +
-    `&mode=ArtList&maxrecords=50&format=json&timespan=72h&sort=DateDesc`;
+    `&mode=ArtList&maxrecords=15&format=json&timespan=48h&sort=DateDesc`;
 
-  const resp = await fetch(url);
-  if (!resp.ok) {
-    throw new Error(`GDELT failed for ${region.id}: ${resp.status}`);
+  try {
+    const data = await fetchGdeltJson(url, 3);
+
+    const articles = (data.articles || []).map((a, idx) => ({
+      id: `${region.id}-${idx}`,
+      regionId: region.id,
+      regionLabel: region.label,
+      title: a.title || 'Untitled',
+      source: a.domain || a.sourcecountry || 'Unknown source',
+      url: a.url || '#',
+      image: a.socialimage || '',
+      seenAt: a.seendate || '',
+      language: a.language || '',
+      score: scoreArticle(a.title, a.domain),
+      color: region.color
+    }));
+
+    const total = articles.length;
+    const hotspot = articles.reduce((sum, a) => sum + a.score, 0);
+
+    return {
+      region: {
+        id: region.id,
+        label: region.label,
+        lat: region.lat,
+        lon: region.lon,
+        color: region.color,
+        articleCount: total,
+        hotspot,
+        query: region.query,
+        status: 'ok'
+      },
+      articles
+    };
+  } catch (err) {
+    return {
+      region: {
+        id: region.id,
+        label: region.label,
+        lat: region.lat,
+        lon: region.lon,
+        color: region.color,
+        articleCount: 0,
+        hotspot: 0,
+        query: region.query,
+        status: 'degraded',
+        error: err.message
+      },
+      articles: []
+    };
   }
-
-  const data = await resp.json();
-  const articles = (data.articles || []).map((a, idx) => ({
-    id: `${region.id}-${idx}`,
-    regionId: region.id,
-    regionLabel: region.label,
-    title: a.title || 'Untitled',
-    source: a.domain || a.sourcecountry || 'Unknown source',
-    url: a.url || '#',
-    image: a.socialimage || '',
-    seenAt: a.seendate || '',
-    language: a.language || '',
-    score: scoreArticle(a.title, a.domain),
-    color: region.color
-  }));
-
-  const total = articles.length;
-  const hotspot = articles.reduce((sum, a) => sum + a.score, 0);
-  const top = articles.slice(0, 12);
-
-  return {
-    region: {
-      id: region.id,
-      label: region.label,
-      lat: region.lat,
-      lon: region.lon,
-      color: region.color,
-      articleCount: total,
-      hotspot,
-      query: region.query
-    },
-    articles: top
-  };
 }
 
 async function fetchAllRegions() {
-  const results = await Promise.all(
-    WATCHLIST.map((r) => fetchWithCache(`region:${r.id}`, () => fetchRegion(r)))
-  );
+  const results = [];
+
+  for (let i = 0; i < WATCHLIST.length; i++) {
+    const region = WATCHLIST[i];
+    const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region, i));
+    results.push(data);
+  }
 
   const regions = results
     .map((r) => r.region)
@@ -216,7 +288,8 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 500, {
         error: err.message,
         regions: [],
-        articles: []
+        articles: [],
+        updatedAt: new Date().toISOString()
       });
     }
     return;
@@ -232,7 +305,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region));
+      const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region, 0));
       sendJson(res, 200, data);
     } catch (err) {
       sendJson(res, 500, {
