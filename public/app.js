@@ -270,3 +270,46 @@ async function loadAll() {
 loadAll();
 setInterval(loadAll, 5 * 60 * 1000);
 window.addEventListener('resize', renderTrendChart);
+
+function initRealGlobe() {
+  const globeEl = document.getElementById('globe');
+  if (!globeEl || typeof Globe === 'undefined') return;
+
+  globeEl.innerHTML = '';
+
+  const globe = Globe()(globeEl)
+    .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+    .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor('#67e8ff')
+    .atmosphereAltitude(0.18);
+
+  const points = state.regions.map((r) => ({
+    lat: r.lat,
+    lng: r.lon,
+    size: Math.max(0.18, r.hotspot / 180),
+    color: r.color,
+    label: `${r.label} • hotspot ${r.hotspot}`
+  }));
+
+  globe
+    .pointsData(points)
+    .pointAltitude('size')
+    .pointColor('color')
+    .pointRadius(0.45)
+    .onPointClick((point) => {
+      const region = state.regions.find(
+        (r) => r.lat === point.lat && r.lon === point.lng
+      );
+      if (region) selectRegion(region.id);
+    });
+
+  globe.controls().autoRotate = true;
+  globe.controls().autoRotateSpeed = 0.5;
+}
+
+const originalLoadAll = loadAll;
+loadAll = async function () {
+  await originalLoadAll();
+  initRealGlobe();
+};
