@@ -145,18 +145,46 @@ function renderArticleFeed() {
   });
 }
 
+function updateHero() {
+  els.heroRegionCount.textContent = String(state.regions.length);
+  els.heroArticleCount.textContent = String(state.articles.length);
+  els.heroTopRegion.textContent = state.regions[0]?.label || '--';
+}
+
 function initOrUpdateGlobe() {
   if (!els.globeEl || typeof Globe === 'undefined') return;
+
+  const arcs = state.regions.map((r, i) => ({
+    startLat: 20,
+    startLng: -10,
+    endLat: r.lat,
+    endLng: r.lon,
+    color: [r.color, r.color],
+    stroke: 0.65,
+    dashLength: 0.45,
+    dashGap: 0.18,
+    dashInitialGap: i * 0.25,
+    dashAnimateTime: 2000 + i * 180
+  }));
+
+  const rings = state.regions.map((r) => ({
+    lat: r.lat,
+    lng: r.lon,
+    color: r.color,
+    maxR: 4.2,
+    propagationSpeed: 1.5,
+    repeatPeriod: 1200 + Math.max(0, 3000 - r.hotspot * 30)
+  }));
 
   const points = state.regions.map((r) => ({
     lat: r.lat,
     lng: r.lon,
-    size: Math.max(0.18, r.hotspot / 180),
+    size: Math.max(0.35, Math.min(0.95, r.hotspot / 55)),
     color: r.color,
     label: `
       <div style="
         padding:10px 12px;
-        background:rgba(6,18,28,.92);
+        background:rgba(6,18,28,.94);
         border:1px solid rgba(86,214,255,.22);
         border-radius:12px;
         color:#ecf7ff;
@@ -175,23 +203,37 @@ function initOrUpdateGlobe() {
 
     state.globe = Globe()(els.globeEl)
       .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+      .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
       .backgroundColor('rgba(0,0,0,0)')
       .showAtmosphere(true)
       .atmosphereColor('#59dcff')
-      .atmosphereAltitude(0.14)
+      .atmosphereAltitude(0.16)
       .width(els.globeEl.clientWidth)
       .height(els.globeEl.clientHeight);
 
     state.globe.controls().autoRotate = true;
-    state.globe.controls().autoRotateSpeed = 0.45;
+    state.globe.controls().autoRotateSpeed = 0.38;
   }
 
   state.globe
+    .arcsData(arcs)
+    .arcColor('color')
+    .arcDashLength('dashLength')
+    .arcDashGap('dashGap')
+    .arcDashInitialGap('dashInitialGap')
+    .arcDashAnimateTime('dashAnimateTime')
+    .arcStroke('stroke')
+    .arcAltitude(0.18)
     .pointsData(points)
     .pointAltitude('size')
     .pointColor('color')
-    .pointRadius(0.42)
+    .pointRadius(0.22)
     .pointLabel('label')
+    .ringsData(rings)
+    .ringColor('color')
+    .ringMaxRadius('maxR')
+    .ringPropagationSpeed('propagationSpeed')
+    .ringRepeatPeriod('repeatPeriod')
     .onPointClick((point) => {
       const region = state.regions.find((r) => r.lat === point.lat && r.lon === point.lng);
       if (region) selectRegion(region.id);
@@ -199,14 +241,8 @@ function initOrUpdateGlobe() {
 
   if (state.regions.length >= 1) {
     const top = state.regions[0];
-    state.globe.pointOfView({ lat: top.lat, lng: top.lon, altitude: 1.8 }, 900);
+    state.globe.pointOfView({ lat: top.lat, lng: top.lon, altitude: 1.7 }, 900);
   }
-}
-
-function updateHero() {
-  els.heroRegionCount.textContent = String(state.regions.length);
-  els.heroArticleCount.textContent = String(state.articles.length);
-  els.heroTopRegion.textContent = state.regions[0]?.label || '--';
 }
 
 function selectRegion(id) {
@@ -217,7 +253,7 @@ function selectRegion(id) {
 
   const region = state.regions.find((r) => r.id === id);
   if (region && state.globe) {
-    state.globe.pointOfView({ lat: region.lat, lng: region.lon, altitude: 1.55 }, 900);
+    state.globe.pointOfView({ lat: region.lat, lng: region.lon, altitude: 1.45 }, 900);
   }
 }
 
