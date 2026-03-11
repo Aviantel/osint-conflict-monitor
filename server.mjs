@@ -14,7 +14,7 @@ const WATCHLIST = [
     label: 'Ukraine',
     lat: 49.0,
     lon: 31.0,
-    search: 'Ukraine war OR Kyiv OR Kharkiv OR Donetsk missile drone attack',
+    search: 'Ukraine war Kyiv Kharkiv Donetsk Zaporizhzhia Crimea missile drone attack',
     color: '#ff6b6b'
   },
   {
@@ -22,7 +22,7 @@ const WATCHLIST = [
     label: 'Gaza / Israel',
     lat: 31.4,
     lon: 34.4,
-    search: 'Gaza Israel conflict OR Rafah OR Tel Aviv OR Jerusalem airstrike rocket attack',
+    search: 'Gaza Israel conflict Rafah Tel Aviv Jerusalem airstrike rocket attack',
     color: '#ffd166'
   },
   {
@@ -104,23 +104,18 @@ async function fetchWithCache(key, fetcher) {
 function scoreArticle(title = '', source = '') {
   const text = `${title} ${source}`.toLowerCase();
   let score = 1;
-
   const high = ['missile', 'airstrike', 'drone', 'offensive', 'incursion', 'naval', 'frontline', 'attack', 'explosion', 'strike'];
   const med = ['troops', 'military', 'ceasefire', 'sanctions', 'exercise', 'tension', 'warning', 'ship'];
 
-  for (const word of high) {
-    if (text.includes(word)) score += 3;
-  }
-  for (const word of med) {
-    if (text.includes(word)) score += 1;
-  }
+  for (const word of high) if (text.includes(word)) score += 3;
+  for (const word of med) if (text.includes(word)) score += 1;
 
   return score;
 }
 
 function decodeXml(str = '') {
   return str
-    .replace(/<!\\[CDATA\\[(.*?)\\]\\]>/gs, '$1')
+    .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -129,22 +124,32 @@ function decodeXml(str = '') {
 }
 
 function getTag(block, tag) {
-  const match = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
-  return match ? decodeXml(match[1].trim()) : '';
+  const open = `<${tag}>`;
+  const close = `</${tag}>`;
+  const start = block.indexOf(open);
+  if (start === -1) return '';
+  const end = block.indexOf(close, start + open.length);
+  if (end === -1) return '';
+  return decodeXml(block.slice(start + open.length, end).trim());
 }
 
 function parseRssItems(xml) {
- const matches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
-  return matches.map((m) => {
-    const block = m[1];
-    return {
+  const items = [];
+  const parts = xml.split('<item>');
+  for (let i = 1; i < parts.length; i++) {
+    const end = parts[i].indexOf('</item>');
+    if (end === -1) continue;
+    const block = parts[i].slice(0, end);
+
+    items.push({
       title: getTag(block, 'title'),
       link: getTag(block, 'link'),
       pubDate: getTag(block, 'pubDate'),
       description: getTag(block, 'description'),
       source: getTag(block, 'source') || 'Google News'
-    };
-  });
+    });
+  }
+  return items;
 }
 
 async function fetchGoogleNews(region) {
