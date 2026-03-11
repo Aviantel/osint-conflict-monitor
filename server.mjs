@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const PORT = process.env.PORT || 3000;
+
 async function fetchWithCache(key, fetcher) {
   const hit = cache.get(key);
 
@@ -132,8 +134,6 @@ const server = http.createServer(async (req, res) => {
     else sendFile(res, path.join(publicDir, 'index.html'));
   });
 });
-
-const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
   console.log(`OSINT Conflict Monitor running at http://localhost:${PORT}`);
