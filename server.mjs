@@ -14,8 +14,7 @@ const WATCHLIST = [
     label: 'Ukraine',
     lat: 49.0,
     lon: 31.0,
-    query:
-      '(Ukraine OR Kyiv OR Kharkiv OR Donetsk OR Zaporizhzhia OR Crimea) AND (war OR strike OR missile OR drone OR offensive OR frontline OR attack)',
+    search: 'Ukraine war OR Kyiv OR Kharkiv OR Donetsk missile drone attack',
     color: '#ff6b6b'
   },
   {
@@ -23,8 +22,7 @@ const WATCHLIST = [
     label: 'Gaza / Israel',
     lat: 31.4,
     lon: 34.4,
-    query:
-      '(Gaza OR Israel OR West Bank OR Rafah OR Tel Aviv OR Jerusalem) AND (airstrike OR rocket OR offensive OR ceasefire OR attack OR conflict)',
+    search: 'Gaza Israel conflict OR Rafah OR Tel Aviv OR Jerusalem airstrike rocket attack',
     color: '#ffd166'
   },
   {
@@ -32,8 +30,7 @@ const WATCHLIST = [
     label: 'Red Sea',
     lat: 15.5,
     lon: 42.5,
-    query:
-      '(Red Sea OR Yemen OR Houthis OR Houthi OR Bab el-Mandeb) AND (ship OR shipping OR missile OR drone OR naval OR attack)',
+    search: 'Red Sea Yemen Houthis Houthi Bab el-Mandeb ship missile drone naval attack',
     color: '#67e8ff'
   },
   {
@@ -41,8 +38,7 @@ const WATCHLIST = [
     label: 'Syria',
     lat: 35.0,
     lon: 38.5,
-    query:
-      '(Syria OR Damascus OR Aleppo OR Idlib) AND (strike OR militia OR attack OR conflict OR offensive)',
+    search: 'Syria Damascus Aleppo Idlib strike militia attack offensive',
     color: '#76ffb2'
   },
   {
@@ -50,8 +46,7 @@ const WATCHLIST = [
     label: 'Iran Region',
     lat: 32.0,
     lon: 53.0,
-    query:
-      '(Iran OR Tehran OR Persian Gulf OR Hormuz) AND (military OR strike OR sanctions OR missile OR nuclear OR conflict)',
+    search: 'Iran Tehran Persian Gulf Hormuz missile military nuclear conflict',
     color: '#ff9f68'
   },
   {
@@ -59,18 +54,13 @@ const WATCHLIST = [
     label: 'Taiwan Strait',
     lat: 23.7,
     lon: 121.0,
-    query:
-      '(Taiwan OR Taipei OR Taiwan Strait OR China PLA) AND (military OR incursion OR drill OR ship OR aircraft OR exercise OR tension)',
+    search: 'Taiwan Strait Taipei China PLA military incursion drill ship aircraft tension',
     color: '#d68cff'
   }
 ];
 
 const cache = new Map();
 const CACHE_MS = 5 * 60 * 1000;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function sendJson(res, status, data) {
   res.writeHead(status, {
@@ -105,9 +95,7 @@ function sendFile(res, filePath) {
 
 async function fetchWithCache(key, fetcher) {
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.time < CACHE_MS) {
-    return hit.data;
-  }
+  if (hit && Date.now() - hit.time < CACHE_MS) return hit.data;
   const data = await fetcher();
   cache.set(key, { time: Date.now(), data });
   return data;
@@ -117,32 +105,12 @@ function scoreArticle(title = '', source = '') {
   const text = `${title} ${source}`.toLowerCase();
   let score = 1;
 
-  const high = [
-    'missile',
-    'airstrike',
-    'drone',
-    'offensive',
-    'incursion',
-    'naval',
-    'frontline',
-    'attack',
-    'explosion'
-  ];
-
-  const med = [
-    'troops',
-    'military',
-    'ceasefire',
-    'sanctions',
-    'exercise',
-    'tension',
-    'warning'
-  ];
+  const high = ['missile', 'airstrike', 'drone', 'offensive', 'incursion', 'naval', 'frontline', 'attack', 'explosion', 'strike'];
+  const med = ['troops', 'military', 'ceasefire', 'sanctions', 'exercise', 'tension', 'warning', 'ship'];
 
   for (const word of high) {
     if (text.includes(word)) score += 3;
   }
-
   for (const word of med) {
     if (text.includes(word)) score += 1;
   }
@@ -150,75 +118,87 @@ function scoreArticle(title = '', source = '') {
   return score;
 }
 
-async function fetchGdeltJson(url, retries = 3) {
-  let lastError = null;
-
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 OSINT Conflict Monitor'
-      }
-    });
-
-    if (resp.ok) {
-      return resp.json();
-    }
-
-    if (resp.status === 429) {
-      lastError = new Error(`GDELT rate limited: 429`);
-      await sleep(1200 * (attempt + 1));
-      continue;
-    }
-
-    const text = await resp.text().catch(() => '');
-    throw new Error(`GDELT failed: ${resp.status}${text ? ` ${text.slice(0, 120)}` : ''}`);
-  }
-
-  throw lastError || new Error('GDELT request failed');
+function decodeXml(str = '') {
+  return str
+    .replace(/<!\\[CDATA\\[(.*?)\\]\\]>/gs, '$1')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
 }
 
-async function fetchRegion(region, index = 0) {
-  await sleep(index * 700);
+function getTag(block, tag) {
+  const match = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  return match ? decodeXml(match[1].trim()) : '';
+}
 
-  const encodedQuery = encodeURIComponent(region.query);
-  const url =
-    `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodedQuery}` +
-    `&mode=ArtList&maxrecords=15&format=json&timespan=48h&sort=DateDesc`;
-
-  try {
-    const data = await fetchGdeltJson(url, 3);
-
-    const articles = (data.articles || []).map((a, idx) => ({
-      id: `${region.id}-${idx}`,
-      regionId: region.id,
-      regionLabel: region.label,
-      title: a.title || 'Untitled',
-      source: a.domain || a.sourcecountry || 'Unknown source',
-      url: a.url || '#',
-      image: a.socialimage || '',
-      seenAt: a.seendate || '',
-      language: a.language || '',
-      score: scoreArticle(a.title, a.domain),
-      color: region.color
-    }));
-
-    const total = articles.length;
-    const hotspot = articles.reduce((sum, a) => sum + a.score, 0);
-
+function parseRssItems(xml) {
+  const matches = [...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)];
+  return matches.map((m) => {
+    const block = m[1];
     return {
-      region: {
-        id: region.id,
-        label: region.label,
-        lat: region.lat,
-        lon: region.lon,
-        color: region.color,
-        articleCount: total,
-        hotspot,
-        query: region.query,
-        status: 'ok'
-      },
-      articles
+      title: getTag(block, 'title'),
+      link: getTag(block, 'link'),
+      pubDate: getTag(block, 'pubDate'),
+      description: getTag(block, 'description'),
+      source: getTag(block, 'source') || 'Google News'
     };
+  });
+}
+
+async function fetchGoogleNews(region) {
+  const query = encodeURIComponent(region.search);
+  const url = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
+
+  const resp = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0'
+    }
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Google News RSS failed: ${resp.status}`);
+  }
+
+  const xml = await resp.text();
+  const items = parseRssItems(xml).slice(0, 12);
+
+  const articles = items.map((item, idx) => ({
+    id: `${region.id}-${idx}`,
+    regionId: region.id,
+    regionLabel: region.label,
+    title: item.title || 'Untitled',
+    source: item.source || 'Google News',
+    url: item.link || '#',
+    image: '',
+    seenAt: item.pubDate || '',
+    language: 'en',
+    score: scoreArticle(item.title, item.source),
+    color: region.color
+  }));
+
+  const hotspot = articles.reduce((sum, a) => sum + a.score, 0);
+
+  return {
+    region: {
+      id: region.id,
+      label: region.label,
+      lat: region.lat,
+      lon: region.lon,
+      color: region.color,
+      articleCount: articles.length,
+      hotspot,
+      query: region.search,
+      status: 'ok'
+    },
+    articles
+  };
+}
+
+async function fetchRegion(region) {
+  try {
+    return await fetchGoogleNews(region);
   } catch (err) {
     return {
       region: {
@@ -229,7 +209,7 @@ async function fetchRegion(region, index = 0) {
         color: region.color,
         articleCount: 0,
         hotspot: 0,
-        query: region.query,
+        query: region.search,
         status: 'degraded',
         error: err.message
       },
@@ -240,10 +220,8 @@ async function fetchRegion(region, index = 0) {
 
 async function fetchAllRegions() {
   const results = [];
-
-  for (let i = 0; i < WATCHLIST.length; i++) {
-    const region = WATCHLIST[i];
-    const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region, i));
+  for (const region of WATCHLIST) {
+    const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region));
     results.push(data);
   }
 
@@ -305,7 +283,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region, 0));
+      const data = await fetchWithCache(`region:${region.id}`, () => fetchRegion(region));
       sendJson(res, 200, data);
     } catch (err) {
       sendJson(res, 500, {
@@ -317,7 +295,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  let filePath = path.join(publicDir, url.pathname === '/' ? 'index.html' : url.pathname);
+  const filePath = path.join(publicDir, url.pathname === '/' ? 'index.html' : url.pathname);
 
   if (!filePath.startsWith(publicDir)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
