@@ -1,8 +1,22 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+async function fetchWithCache(key, fetcher) {
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.time < CACHE_MS) return hit.data;
+
+  if (hit && Date.now() - hit.time < CACHE_MS) {
+    return hit.data;
+  }
+
   const data = await fetcher();
-  cache.set(key, { time: Date.now(), data });
+
+  cache.set(key, {
+    time: Date.now(),
+    data
+  });
+
   return data;
 }
 
