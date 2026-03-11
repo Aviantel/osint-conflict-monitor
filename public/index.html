@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT Conflict Monitor</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="scanline"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">TACTICAL OPEN-SOURCE GEOPOLITICAL INTELLIGENCE</div>
+        <h1>OSINT Conflict Monitor</h1>
+        <p class="subhead">Regional hotspots, live headlines, and conflict watchlists on a globe-style command interface.</p>
+      </div>
+      <div class="status-row">
+        <span class="pill" id="statusPill">NET: ONLINE</span>
+        <span class="pill" id="updatedPill">UPDATED: --</span>
+        <span class="pill" id="countPill">REGIONS: 0</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel left-panel">
+        <div class="panel-header"><h2>Hotspot Watchlist</h2></div>
+        <div id="regionList" class="region-list"></div>
+      </section>
+
+      <section class="panel center-panel">
+        <div class="panel-header"><h2>Global Conflict Globe</h2></div>
+        <div class="globe-wrap">
+          <div class="globe" id="globe"></div>
+        </div>
+        <div class="trend-strip">
+          <canvas id="trendCanvas" width="900" height="160"></canvas>
+        </div>
+      </section>
+
+      <section class="panel right-panel">
+        <div class="panel-header"><h2>Regional Brief</h2></div>
+        <div id="regionBrief" class="region-brief empty">Select a region from the watchlist.</div>
+        <div class="panel-header secondary"><h2>Headline Feed</h2></div>
+        <div id="articleFeed" class="article-feed"></div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
