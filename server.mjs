@@ -134,7 +134,7 @@ function getTag(block, tag) {
 }
 
 function parseRssItems(xml) {
-  const matches = [...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)];
+ const matches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
   return matches.map((m) => {
     const block = m[1];
     return {
