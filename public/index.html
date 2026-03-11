@@ -7,49 +7,92 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="scanline"></div>
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow-a"></div>
+  <div class="bg-glow bg-glow-b"></div>
+
   <div class="app-shell">
     <header class="topbar">
-      <div>
+      <div class="brand-wrap">
         <div class="eyebrow">TACTICAL OPEN-SOURCE GEOPOLITICAL INTELLIGENCE</div>
         <h1>OSINT Conflict Monitor</h1>
-        <p class="subhead">Regional hotspots, live headlines, and conflict watchlists on a globe-style command interface.</p>
+        <p class="subhead">
+          Live regional hotspots, headline clustering, and global conflict watchlists.
+        </p>
       </div>
+
       <div class="status-row">
-        <span class="pill" id="statusPill">NET: ONLINE</span>
-        <span class="pill" id="updatedPill">UPDATED: --</span>
-        <span class="pill" id="countPill">REGIONS: 0</span>
+        <div class="status-pill">NET: ONLINE</div>
+        <div class="status-pill" id="updatedPill">UPDATED: --</div>
+        <div class="status-pill" id="countPill">REGIONS: 0</div>
       </div>
     </header>
 
     <main class="layout">
-      <section class="panel left-panel">
-        <div class="panel-header"><h2>Hotspot Watchlist</h2></div>
+      <section class="panel sidebar-left">
+        <div class="panel-title-row">
+          <h2>Hotspot Watchlist</h2>
+          <span class="panel-kicker">LIVE</span>
+        </div>
         <div id="regionList" class="region-list"></div>
       </section>
 
       <section class="panel center-panel">
-        <div class="panel-header"><h2>Global Conflict Globe</h2></div>
-        <div class="globe-wrap">
-          <div class="globe" id="globe"></div>
+        <div class="panel-title-row">
+          <h2>Global Conflict Globe</h2>
+          <span class="panel-kicker">REAL-TIME VIEW</span>
         </div>
-        <div class="trend-strip">
-          <canvas id="trendCanvas" width="900" height="160"></canvas>
+
+        <div class="hero-grid">
+          <div class="hero-stats" id="heroStats">
+            <div class="stat-card">
+              <span>Total Regions</span>
+              <strong id="heroRegionCount">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Total Headlines</span>
+              <strong id="heroArticleCount">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>Top Hotspot</span>
+              <strong id="heroTopRegion">--</strong>
+            </div>
+          </div>
+
+          <div id="globeWrap" class="globe-wrap">
+            <div id="globe"></div>
+          </div>
+        </div>
+
+        <div class="ticker-wrap">
+          <div class="ticker-label">SIGNAL FLOW</div>
+          <div id="ticker" class="ticker"></div>
         </div>
       </section>
 
-      <section class="panel right-panel">
-        <div class="panel-header"><h2>Regional Brief</h2></div>
-        <div id="regionBrief" class="region-brief empty">Select a region from the watchlist.</div>
-        <div class="panel-header secondary"><h2>Headline Feed</h2></div>
+      <section class="panel sidebar-right">
+        <div class="panel-title-row">
+          <h2>Regional Brief</h2>
+          <span class="panel-kicker">SELECTED</span>
+        </div>
+
+        <div id="regionBrief" class="region-brief empty">
+          Select a region from the watchlist.
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="panel-title-row secondary">
+          <h2>Headline Feed</h2>
+          <span class="panel-kicker">OSINT</span>
+        </div>
         <div id="articleFeed" class="article-feed"></div>
       </section>
     </main>
   </div>
-  
-<script src="https://unpkg.com/three"></script>
-<script src="https://unpkg.com/globe.gl"></script>
-<script src="/app.js"></script>
 
+  <script src="https://unpkg.com/three"></script>
+  <script src="https://unpkg.com/globe.gl"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
