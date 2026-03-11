@@ -9,6 +9,30 @@ const publicDir = path.join(__dirname, 'public');
 
 const PORT = 3000;
 
+function sendFile(res, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+
+  const types = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json"
+  };
+
+  const contentType = types[ext] || "text/plain";
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end("File not found");
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+  });
+}
+
 async function fetchWithCache(key, fetcher) {
   const hit = cache.get(key);
 
